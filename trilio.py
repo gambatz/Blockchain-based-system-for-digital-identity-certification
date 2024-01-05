@@ -2,8 +2,16 @@ from architectures.blockchain import Blockchain
 from architectures.block import Block
 from architectures.wallet import Wallet
 from architectures.transaction import Transaction
-from architectures.nft import CollectionStorage, AssetStorage, TradeStorage
+from architectures.nft import CollectionStorage, AssetStorage, TradeStorage, ExpTokenStorage
 from datetime import datetime
+
+wallett=Wallet()
+wallett.create_wallet()
+wallett.create_wallet()
+#wallett.create_wallet()
+
+ix= ExpTokenStorage()
+
 
 class Trilio:
     def __init__(self):
@@ -28,17 +36,27 @@ class Trilio:
                 if self.trilio.chain[i].previous_hash != self.trilio.chain[i-1].hash:
                     return False
     
-    def create_block(self,addresses=None, collections=None, assets=None, trades=None):
+    def create_block(self,addresses, exptokens, collections=None, assets=None, trades=None, ):
         nonce = self.trilio.difficulty ** 12
-
         for i in range(nonce):
             pass
+        if self.trilio.pending_transactions[0].input["type"]=="exptoken-transfer":
+            
+           for i in range (len(self.trilio.chain)):#controllo ciclico sulla sicurezza
+                publ=wallett.get_public_key(self.trilio.mobile_transactions[i].input["data"]["_from"])
+                if self.trilio.pending_transactions[0].input["data"]["exptoken_id"] == self.trilio.mobile_transactions[i].input["data"]["exptoken_id"] and self.trilio.pending_transactions[0].input["data"]["_to"] == publ:
+                   ix._delete_(self.trilio.mobile_transactions[i].input["data"]["exptoken_id"],ix,wallett)
+                   print("Recycled Token")
+                   return "Recycled Token"
+                
+                    
+                
 
         if len(self.trilio.pending_transactions) >= self.trilio.minimum_transactions:
             # block.hash, block.timestamp, block.transactions, block.previous_hash
             transactions = self.trilio.pending_transactions
             self.trilio.pending_transactions = []
-            block = Block(datetime.now().timestamp(), transactions, self.trilio.chain[len(self.trilio.chain)-1].hash, addresses, collections, assets, trades)
+            block = Block(datetime.now().timestamp(), transactions, self.trilio.chain[len(self.trilio.chain)-1].hash, addresses, collections, assets, trades, exptokens)
             self.trilio.chain.append(block)
             return block
         else:
@@ -48,14 +66,17 @@ class Trilio:
         self.trilio.pending_transactions.append(
             Transaction(timestamp,data=data)
         )
+        self.trilio.mobile_transactions.append(
+            Transaction(timestamp,data=data)
+        )
         self.create_block(
-            addresses=self.Wallet,
+            addresses=wallett,
+            exptokens=ix,
             collections=self.CollectionStorage,
             trades=self.TradeStorage,
             assets=self.AssetStorage
         )
     
-
     def get_transaction(self, data):
         for block in self.trilio.chain:
             for transaction in block.transactions:
