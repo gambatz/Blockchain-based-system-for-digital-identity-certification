@@ -21,7 +21,7 @@ while True:
    event, values = window.read()
    print(event, values)
    if event == "Send":
-      result = values['-TO-'] 
+      receiver = values['-TO-'] 
    if event == psg.WIN_CLOSED or event == 'Send':
       break
 window.close()
@@ -31,7 +31,7 @@ catena.create_transaction(
           data={
         "type":"exptoken-transfer",
         "data":{
-            "_to":result,
+            "_to":receiver,
             "_from":wallett.addresses[1]["address"]["pve"],
             "exptoken_id":wallett.addresses[1]["info"]["exptokens"][0],
             
