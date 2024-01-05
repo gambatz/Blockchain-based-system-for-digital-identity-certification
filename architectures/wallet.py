@@ -16,9 +16,11 @@ class Wallet:
                 "pbc":public_key 
             }, 
             "info": {
-                "balance":float(0),
+                "balance":float(180),
                 "assets" : [],
-                "collections" : []
+                "exptokens" : [],
+                "collections" : [],
+                "benefits" :int(0)
             }
         }
         if self.validate_address(private_key, public_key) == False:
@@ -56,6 +58,7 @@ class Wallet:
     
     def get_public_key(self, private_key=None):
         if private_key == None:
+            print("fallito")
             return "Failed"
         
         for address in self.addresses:

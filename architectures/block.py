@@ -1,5 +1,9 @@
-from datetime import datetime
-import hashlib, time
+from datetime import datetime, timedelta
+import hashlib, random
+from operator import index
+from architectures.config import Config
+
+
 
 class Trade:
     def __init__(self, timestamp, _to, _from, fassets, tassets, tradestorage):
@@ -113,14 +117,56 @@ class Asset:
             if address["address"]["pbc"] == public_key:
                 address["info"]["assets"].append(self.id)
 
+class ExpiringTokenAutority:
+    def __init__(self,public_key, _ad=None, _ex=None):
+        duration=Config()
+        identifier = random.randint(100000000000,99999999999999)
+        self.id="id"+str(hashlib.sha256(str(identifier).encode('utf-8')).hexdigest())
+        self.owner = public_key
+        self.creation = datetime.now()
+        self.expires = self.creation + duration.expiring_token_duration
+        _ex.exptokens.append(self)
+        for address in _ad.addresses:
+            if address["address"]["pbc"] == public_key:
+                address["info"]["exptokens"].append(self.id)
+
+    def expires_in(self,id,exptokenstorage,addresses = "", _ex=None):
+        for exptoken in exptokenstorage.exptokens:
+            if exptoken.id == id:
+               time_elapsed = timedelta(seconds=0)-exptoken.expiring_token_duration
+               left_time = exptoken.expiring_token_duration - time_elapsed 
+            if left_time<timedelta(seconds=0):
+               for address in addresses.addresses:
+                    if address["address"]["pbc"] == exptoken.owner:
+                       address["info"]["exptokens"].pop(address["info"]["exptoken"].index(exptoken.id))
+               _ex.exptokens.pop(_ex.exptokens.index(self))
+        return left_time
+    
+    def _delete_(self,id,exptokenstorage,_ad):
+        for exptoken in exptokenstorage.exptokens:
+            for address in _ad.addresses:
+                if address["address"]["pbc"] == exptoken.owner:
+                   address["info"]["exptokens"].pop(address["info"]["exptokens"].index(exptoken.id))
+        for exptoken in exptokenstorage.exptokens:
+            if exptoken.id == id:
+               exptokenstorage.exptokens.pop(exptokenstorage.exptokens.index(self))
+    def renew(self,id,exptokenstorage):
+        duration=Config()
+        for exptoken in exptokenstorage.exptokens:
+            if exptoken.id == id:
+               exptoken.expires = datetime.now() + duration.expiring_token_duration
+        return exptoken.expires 
 
 
 class Block:
-    def __init__(self, timestamp, transactions, previous_hash="",addresses = "", collections="", assets="", trades="", asset=""):
+    def __init__(self, timestamp, transactions, previous_hash="",addresses = "", collections="", assets="", trades="",exptokens="", asset="",exptoken=""):
         self.addresses = addresses
         self.asset = asset
+        self.exptoken = exptoken
         self.collections = collections
+        self.config=Config()
         self.assets = assets
+        self.exptokens = exptokens
         self.trades = trades
         self.timestamp = timestamp
         self.transactions = transactions
@@ -142,6 +188,8 @@ class Block:
                 return
             
             if transaction.input["type"] == "token-transfer":
+                print("rupert")
+
                 if float(transaction.input["data"]["amount"]) >= 0:
                     if transaction.input["data"]["to"] == pbc:
                         return
@@ -167,7 +215,39 @@ class Block:
                     TradeHandler().accept_trade(transaction.input["data"]["id"],transaction.input["data"]["signer"], self.addresses, self.assets, self.addresses, self.trades)
                 elif transaction.input["action"] == "decline-trade":
                     TradeHandler().decline_trade(transaction.input["data"]["id"],transaction.input["data"]["signer"], self.addresses, self.assets, self.addresses, self.trades)
+            elif transaction.input["type"] == "exptoken-transfer":
+                 if transaction.input["data"]["_to"] == self.addresses.get_public_key(transaction.input["data"]["_from"]):
+                        return
+                 publ=self.addresses.get_public_key(transaction.input["data"] ["_from"])
+                 for i in range (len(self.transactions)):
+                    if transaction.input["data"]["exptoken_id"] == self.transactions[i].input["data"]["exptoken_id"] and transaction.input["data"]["_to"] == publ:
+                       print("recycled token")
+                       for exptoken_id in transaction.input["data"]["exptoken_id"]:
+                           for exptoken in self.exptokens.exptokens:
+                                if exptoken.id == exptoken_id:
+                                   self.exptokens.exptokens.pop(index(exptoken.id))
+                 
+                 for exptoken in self.exptokens.exptokens:
+                         if exptoken.id == transaction.input["data"]["exptoken_id"]:
+                            for address in self.addresses.addresses:
+                                if address["address"]["pbc"] == publ:
+                                   address["info"]["exptokens"].pop(address["info"]["exptokens"].index(exptoken.id))
+                                   ExpiringTokenAutority(None,self.addresses,self.exptokens).renew(exptoken.id,self.exptokens)
+                            for address in self.addresses.addresses:
+                                if address["address"]["pbc"] == transaction.input["data"]["_to"]:
+                                   exptoken.owner = transaction.input["data"]["_to"]
+                                   address["info"]["exptokens"].append(exptoken.id)
+                            for address in  self.addresses.addresses:
+                                if address["address"] ["pbc"] == publ:
+                                   address["info"]["benefits"] += 1
+                                if address["info"]["benefits"] == self.config.treshold_for_benefit:
+                                   ExpiringTokenAutority(publ,self.addresses,self.exptokens)
+                                   address["info"]["benefits"]=0
+
+                    
+                    
             elif transaction.input["type"] == "asset-transfer":
+
                 # check if the user owns the assets
                 # check if the other user owns the assets
                 if transaction.input["data"]["_to"] == self.addresses.get_public_key(transaction.input["data"]["_from"]):

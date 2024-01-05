@@ -11,5 +11,9 @@ class Blockchain:
         self.pending_transactions = [
 
         ]
+        self.mobile_transactions = [
+
+        ]
+
 
 
